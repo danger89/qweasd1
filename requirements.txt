@@ -21,3 +21,4 @@ python-binance
 pybit
 python-dateutil
 requests_html
+ccxt

@@ -3,14 +3,7 @@ import sys
 from datetime import datetime
 from pprint import pprint
 from time import sleep
-from ccxt.base.decimal_to_precision import DECIMAL_PLACES  # noqa F401
-from ccxt.base.decimal_to_precision import NO_PADDING  # noqa F401
-from ccxt.base.decimal_to_precision import PAD_WITH_ZERO  # noqa F401
-from ccxt.base.decimal_to_precision import ROUND  # noqa F401
-from ccxt.base.decimal_to_precision import SIGNIFICANT_DIGITS  # noqa F401
-from ccxt.base.decimal_to_precision import TICK_SIZE  # noqa F401
-from ccxt.base.decimal_to_precision import TRUNCATE  # noqa F401
-from ccxt.base.decimal_to_precision import decimal_to_precision  # noqa F401
+
 import telebot
 import undetected_chromedriver.v2 as uc
 from binance import Client
@@ -35,14 +28,6 @@ api_secret = admin.api_secret
 client = Client(api_key, api_secret)
 
 bots = telebot.TeleBot(token)
-
-
-def get_count(number):
-    s = str(number)
-    if '.' in s:
-        return abs(s.find('.') - len(s)) - 1
-    else:
-        return 0
 
 
 def get_orders(name_trader, symbol, date):
@@ -74,8 +59,6 @@ class Command(BaseCommand):
                 options = webdriver.ChromeOptions()
                 options.add_argument("window-size=1920x1480")
                 options.add_argument("disable-dev-shm-usage")
-                options.add_argument('--headless')
-
                 driver = webdriver.Chrome(
                     chrome_options=options, executable_path=ChromeDriverManager().install()
                 )
@@ -90,7 +73,7 @@ class Command(BaseCommand):
                     driver.get(link)
                     driver.implicitly_wait(3)
                     try:
-                        driver.find_element(By.ID, 'onetrust-accept-btn-handler').click()
+                       driver.find_element(By.ID, 'onetrust-accept-btn-handler').click()
                     except:
                         sleep(1)
 
@@ -110,26 +93,23 @@ class Command(BaseCommand):
                                 size = data[1]
                                 entry_price = data[2].replace(',', '')
                                 mark_price = data[3]
-                                pnl = data[4].split(' ')
+                                pnl = data[4]
                                 date = data[5]
                                 # число на сколько нужно округлить объем для ордера
                                 round_size = 0
                                 # шаг цены в торговой паре
                                 step_size = 1
+                                pprint(data)
                                 with open('data_file.json') as f:
                                     templates = json.load(f)
 
                                 for temp in templates:
                                     if temp['symbol'] == symbol:
                                         step_size = float(temp['stepSize'])
+                                        round_size = (float(temp['min_amount']))
                                         break
-
-                                if step_size >= 1:
-                                    step_size = round(step_size)
-                                round_size = get_count(step_size) - 1
-                                if round_size <= 0:
-                                    round_size = 0
-
+                                if round_size == 0:
+                                    round_size = 1
                                 curent_price = float(entry_price)
                                 # округляем и передаем в переменную
                                 # quantity_m = round_step_size(volume, round_size)
@@ -144,16 +124,7 @@ class Command(BaseCommand):
                                     else:
                                         break
 
-                                if min_amount_m >= 10:
-                                    quantity = float(decimal_to_precision(min_amount_m,
-                                                                          ROUND,
-                                                                          0,
-                                                                          DECIMAL_PLACES))
-                                else:
-                                    quantity = float(decimal_to_precision(min_amount_m,
-                                                                          ROUND,
-                                                                          round_size,
-                                                                          DECIMAL_PLACES))
+                                quantity = round_step_size(min_amount_m, step_size)
                                 print(quantity)
 
                                 if not get_orders(name, symbol, date):
@@ -172,7 +143,7 @@ class Command(BaseCommand):
                                         )
                                         signal.save()
                                         client.futures_change_leverage(symbol=symbol, leverage=admin.admin_leverage)
-                                        # client.futures_change_margin_type(symbol=symbol, marginType='ISOLATED')
+                                        client.futures_change_margin_type(symbol=symbol, marginType='ISOLATED')
 
                                         # создаем рыночный ордер по сигналу
                                         order = client.futures_create_order(
@@ -182,14 +153,11 @@ class Command(BaseCommand):
                                             quantity=quantity
                                         )
 
-                                        msg = f'🚨 *{name}* OPEN position\n' \
-                                              f'🪙 Coin : {symbol}\n' \
-                                              f'🚀 Trade : SELL (SHORT) 🔻\n\n' \
-                                              f'💰 ROE :  {pnl[1]}%\n' \
-                                              f'💰 PNL :  {pnl[0]}$\n\n' \
-                                              f'✅ Entry : {entry_price} $\n' \
-                                              f'✅ Exit :  $\n' \
-                                              f'📅 Time : {date}'
+                                        msg = f'New trade detected! 🚨\n' \
+                                              f'Trader: {name}\n' \
+                                              f'Crypto: {symbol}\n' \
+                                              f'Trade: SELL (SHORT)🔻\n' \
+                                              f'Price: {entry_price}\n'
                                         print(msg)
                                         bots.send_message(my_id, msg)
 
@@ -207,10 +175,8 @@ class Command(BaseCommand):
                                         )
                                         signal.save()
                                         client.futures_change_leverage(symbol=symbol, leverage=admin.admin_leverage)
-                                        # try:
-                                        #     client.futures_change_margin_type(symbol=symbol, marginType='ISOLATED')
-                                        # except:
-                                        #     pass
+                                        client.futures_change_margin_type(symbol=symbol, marginType='ISOLATED')
+
                                         # создаем рыночный ордер по сигналу
                                         order = client.futures_create_order(
                                             symbol=symbol,
@@ -219,14 +185,11 @@ class Command(BaseCommand):
                                             quantity=quantity
                                         )
 
-                                        msg = f'🚨 *{name}* OPEN position\n' \
-                                              f'🪙 Coin : {symbol}\n' \
-                                              f'🚀 Trade : Buy (LONG)🟢\n\n' \
-                                              f'💰 ROE :  {pnl[1]}%\n' \
-                                              f'💰 PNL :  {pnl[0]}$\n\n' \
-                                              f'✅ Entry : {entry_price} $\n' \
-                                              f'✅ Exit :  $\n' \
-                                              f'📅 Time : {date}'
+                                        msg = f'New trade detected! 🚨\n' \
+                                              f'Trader: {name}\n' \
+                                              f'Crypto: {symbol}\n' \
+                                              f'Trade: Buy (LONG)🟢\n' \
+                                              f'Price: {entry_price}\n'
                                         print(msg)
                                         bots.send_message(my_id, msg)
                     except Exception as e:
@@ -244,7 +207,6 @@ class Command(BaseCommand):
                     delta = a.seconds / 60
                     # если срок годности ордера больше 15 минут то получаем информацию об открытой позиции
                     # и закрываем её
-                    pnl = str(order_s.pnl).split(' ')
                     if delta >= 1:
                         qty = float(client.futures_get_all_orders(symbol=order_s.symbol)[-1]['origQty'])
                         if order_s.side == 'BUY':
@@ -255,14 +217,8 @@ class Command(BaseCommand):
                                 quantity=qty,
                             )
                             order_s.delete()
-                            msg = f'🚨 *{order_s.name}* CLOSED position\n' \
-                                  f'🪙 Coin : {order_s.symbol}\n' \
-                                  f'🚀 Trade : Buy (LONG)🟢\n\n' \
-                                  f'💰 ROE :  {pnl[1]}%\n' \
-                                  f'💰 PNL :  {pnl[0]}$\n\n' \
-                                  f'✅ Entry : {order_s.entry_price} $\n' \
-                                  f'✅ Exit :  {order_s.mark_price}$\n' \
-                                  f'📅 Time : {order_s.date}'
+                            msg = f'POSITION Closed!\n' \
+                                  f'Symbol: {order_s.symbol}\n'
                             bots.send_message(my_id, msg)
                         else:
                             client.futures_create_order(
@@ -272,14 +228,8 @@ class Command(BaseCommand):
                                 quantity=qty,
                             )
                             order_s.delete()
-                            msg = f'🚨 *{order_s.name}* CLOSED position\n' \
-                                  f'🪙 Coin : {order_s.symbol}\n' \
-                                  f'🚀 Trade : SELL (SHORT) 🔻\n\n' \
-                                  f'💰 ROE :  {pnl[1]}%\n' \
-                                  f'💰 PNL :  {pnl[0]}$\n\n' \
-                                  f'✅ Entry : {order_s.entry_price} $\n' \
-                                  f'✅ Exit :  {order_s.mark_price}$\n' \
-                                  f'📅 Time : {order_s.date}'
+                            msg = f'POSITION Closed!\n' \
+                                  f'Symbol: {order_s.symbol}\n'
                             bots.send_message(my_id, msg)
 
                 sig_old = Signal.objects.filter(is_active=False).delete()
