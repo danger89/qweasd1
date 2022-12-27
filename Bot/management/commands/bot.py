@@ -253,6 +253,8 @@ class Command(BaseCommand):
                                 side='SELL',
                                 type='MARKET',
                                 quantity=qty,
+                                reduceOnly=True,
+
                             )
                             order_s.delete()
                             msg = f'🚨 *{order_s.name}* CLOSED position\n' \
@@ -270,6 +272,8 @@ class Command(BaseCommand):
                                 side='BUY',
                                 type='MARKET',
                                 quantity=qty,
+                                reduceOnly=True,
+
                             )
                             order_s.delete()
                             msg = f'🚨 *{order_s.name}* CLOSED position\n' \
