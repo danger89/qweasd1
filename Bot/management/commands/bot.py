@@ -1,8 +1,12 @@
 import json
 import sys
 from datetime import datetime
-from pprint import pprint
 from time import sleep
+
+import telebot
+import undetected_chromedriver.v2 as uc
+from binance import Client
+from bs4 import BeautifulSoup
 from ccxt.base.decimal_to_precision import DECIMAL_PLACES  # noqa F401
 from ccxt.base.decimal_to_precision import NO_PADDING  # noqa F401
 from ccxt.base.decimal_to_precision import PAD_WITH_ZERO  # noqa F401
@@ -11,16 +15,12 @@ from ccxt.base.decimal_to_precision import SIGNIFICANT_DIGITS  # noqa F401
 from ccxt.base.decimal_to_precision import TICK_SIZE  # noqa F401
 from ccxt.base.decimal_to_precision import TRUNCATE  # noqa F401
 from ccxt.base.decimal_to_precision import decimal_to_precision  # noqa F401
-import telebot
-import undetected_chromedriver.v2 as uc
-from binance import Client
-from binance.helpers import round_step_size
-from bs4 import BeautifulSoup
 from dateutil import parser
 from django.core.management.base import BaseCommand
 from html2text import html2text
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
 
 from Bot.models import Signal, Traders, Admin
 
@@ -62,46 +62,45 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         while True:
+            sleep(20)
             try:
                 traders = Traders.objects.all()
 
                 options = uc.ChromeOptions()
-                options.headless = True
                 options.add_experimental_option("excludeSwitches", ["enable-logging"])
-                # driver = webdriver.Chrome(path, options=options)
-                from webdriver_manager.chrome import ChromeDriverManager
 
-                options = webdriver.ChromeOptions()
                 options.add_argument("window-size=1920x1480")
                 options.add_argument("disable-dev-shm-usage")
                 options.add_argument('--headless')
 
-                driver = webdriver.Chrome(
-                    chrome_options=options, executable_path=ChromeDriverManager().install()
-                )
-                # from requests_html import HTMLSession
-                #
-                # session = HTMLSession()
+                try:
+                    driver = webdriver.Chrome(
+                        chrome_options=options, executable_path=ChromeDriverManager(
+                            version='104.0.5112.79'
+                        ).install()
+                    )
+                except:
+                    driver = webdriver.Chrome(
+                        chrome_options=options, executable_path=ChromeDriverManager(
+                            version='104.0.5112.79'
+                        ).install()
+                    )
                 for trade in traders:
 
                     link = trade.link
                     name = trade.name
 
                     driver.get(link)
-                    driver.implicitly_wait(3)
+                    driver.implicitly_wait(7)
                     try:
                         driver.find_element(By.ID, 'onetrust-accept-btn-handler').click()
                     except:
-                        sleep(1)
-
-                    # rs = session.get(link)
-                    # rs.html.render(timeout=40)  # Без этого не будет выполнения js кода
+                        sleep(4)
 
                     main_page = driver.page_source
 
                     soup = BeautifulSoup(main_page, 'html.parser')
                     text = soup.find_all('tbody', {'class': 'bn-table-tbody'})
-                    # rs.close()
                     try:
                         for tex in text[0].find_all_next('tr'):
                             data = html2text(str(tex)).replace('\n', '').split('|')
@@ -132,7 +131,6 @@ class Command(BaseCommand):
 
                                 curent_price = float(entry_price)
                                 # округляем и передаем в переменную
-                                # quantity_m = round_step_size(volume, round_size)
                                 wa = (float(admin.balance) * float(admin.admin_leverage))
                                 print('wa ' + str(wa))
                                 # минимальный объем для ордера
@@ -172,10 +170,8 @@ class Command(BaseCommand):
                                         )
                                         signal.save()
                                         client.futures_change_leverage(symbol=symbol, leverage=admin.admin_leverage)
-                                        # client.futures_change_margin_type(symbol=symbol, marginType='ISOLATED')
-
                                         # создаем рыночный ордер по сигналу
-                                        order = client.futures_create_order(
+                                        client.futures_create_order(
                                             symbol=symbol,
                                             side='SELL',
                                             type='MARKET',
@@ -207,12 +203,8 @@ class Command(BaseCommand):
                                         )
                                         signal.save()
                                         client.futures_change_leverage(symbol=symbol, leverage=admin.admin_leverage)
-                                        # try:
-                                        #     client.futures_change_margin_type(symbol=symbol, marginType='ISOLATED')
-                                        # except:
-                                        #     pass
                                         # создаем рыночный ордер по сигналу
-                                        order = client.futures_create_order(
+                                        client.futures_create_order(
                                             symbol=symbol,
                                             side='BUY',
                                             type='MARKET',
@@ -242,10 +234,10 @@ class Command(BaseCommand):
 
                     a = now - parser.parse(date_end)
                     delta = a.seconds / 60
-                    # если срок годности ордера больше 15 минут то получаем информацию об открытой позиции
+                    # если срок годности ордера больше 15 минут, то получаем информацию об открытой позиции
                     # и закрываем её
                     pnl = str(order_s.pnl).split(' ')
-                    if delta >= 1:
+                    if delta >= 4:
                         qty = float(client.futures_get_all_orders(symbol=order_s.symbol)[-1]['origQty'])
                         if order_s.side == 'BUY':
                             client.futures_create_order(
@@ -253,7 +245,7 @@ class Command(BaseCommand):
                                 side='SELL',
                                 type='MARKET',
                                 quantity=qty,
-                                reduceOnly=True,
+                                reduceOnly=True
 
                             )
                             order_s.delete()
@@ -272,8 +264,7 @@ class Command(BaseCommand):
                                 side='BUY',
                                 type='MARKET',
                                 quantity=qty,
-                                reduceOnly=True,
-
+                                reduceOnly=True
                             )
                             order_s.delete()
                             msg = f'🚨 *{order_s.name}* CLOSED position\n' \
@@ -286,7 +277,7 @@ class Command(BaseCommand):
                                   f'📅 Time : {order_s.date}'
                             bots.send_message(my_id, msg)
 
-                sig_old = Signal.objects.filter(is_active=False).delete()
+                Signal.objects.filter(is_active=False).delete()
 
             except Exception as e:
                 exc_type, exc_obj, exc_tb = sys.exc_info()
