@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime
 from time import sleep
 from binance import Client
@@ -54,7 +55,8 @@ def get_trader(trade, admin):
     options.add_argument('--remote-debugging-port=9222')
     options.page_load_strategy = 'eager'
     driver = webdriver.Chrome(
-        options=options, service=Service(ChromeDriverManager().install()),
+        os.environ.get("CHROMEDRIVER_PATH"),
+        options=options,  # service=Service(ChromeDriverManager().install()),
     )
     driver.get(link)
 
