@@ -1,6 +1,8 @@
+import os
 import sys
 from datetime import datetime
 from time import sleep
+import heroku3
 
 import telebot
 from binance import Client
@@ -81,7 +83,7 @@ class Command(BaseCommand):
                     # если срок годности ордера больше 15 минут, то получаем информацию об открытой позиции
                     # и закрываем её
                     pnl = str(order_s.pnl).split(' ')
-                    if delta >= 4:
+                    if delta >= 3:
                         qty = float(client.futures_get_all_orders(symbol=order_s.symbol)[-1]['origQty'])
                         if order_s.side == 'BUY':
                             client.futures_create_order(
@@ -123,9 +125,45 @@ class Command(BaseCommand):
 
                 Signal.objects.filter(is_active=False).delete()
 
-            except Exception as e:
+            except IndexError as e:
+
+                # Your Heroku API key
+
+                api_key_heroku = os.environ.get("api_key_heroku")
+
+                # The name of your app and dyno
+
+                app_name = os.environ.get("app_name")
+
+                heroku_conn = heroku3.from_key(api_key_heroku)
+
+                app = heroku_conn.app(app_name)
+
+                app.restart()
+
                 exc_type, exc_obj, exc_tb = sys.exc_info()
-                bots.send_message(798093480, str(e))
+
                 print(f'{e} line = {str(exc_tb.tb_lineno)}')
+
+            except Exception as e:
+
+                # Your Heroku API key
+
+                api_key_heroku = os.environ.get("api_key_heroku")
+
+                # The name of your app and dyno
+
+                app_name = os.environ.get("app_name")
+
+                heroku_conn = heroku3.from_key(api_key_heroku)
+
+                app = heroku_conn.app(app_name)
+
+                app.restart()
+
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+
+                print(f'{e} line = {str(exc_tb.tb_lineno)}')
+
                 sleep(15)
             sleep(5)

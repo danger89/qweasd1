@@ -80,7 +80,7 @@ def get_trader(trade, admin):
     api_secret = admin.api_secret
 
     client = Client(api_key, api_secret)
-    # driver.close()
+    driver.close()
     for tex in text[0].find_all_next('tr'):
         data = html2text(str(tex)).replace('\n', '').split('|')
         if data[0].find('USDT') >= 0 or data[0].find('BUSD') >= 0:
@@ -149,6 +149,7 @@ def get_trader(trade, admin):
                     )
                     signal.save()
                     client.futures_change_leverage(symbol=symbol, leverage=admin.admin_leverage)
+                    client.futures_change_margin_type(symbol=symbol, marginType='ISOLATED')
                     # создаем рыночный ордер по сигналу
                     client.futures_create_order(
                         symbol=symbol,
